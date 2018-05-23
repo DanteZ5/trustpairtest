@@ -2,12 +2,38 @@ require 'open-uri'
 require 'csv'
 require 'json'
 
-# variables to store datas
-before_1950 = 0
-between_1950_and_1975 = 0
-between_1976_and_1995 = 0
-between_1996_and_2005 = 0 # guess there is a mistake in readme
-after_2005 = 0
+results = {valid_sirets: 0, invalid_sirets: 0, before_1950: 0, between_1950_and_1975: 0, between_1976_and_1995: 0, between_1996_and_2005: 0, after_2005: 0 }
+
+def results_calculation(sirene, sirets_counter, results)
+  results[:valid_sirets] = sirene['records'].length
+  results[:invalid_sirets] = sirets_counter - sirene['records'].length
+
+  sirene['records'].each do |record|
+    creation_year = record['record']['fields']['dcren'][0..3].to_i
+    if creation_year > 2005
+      results[:after_2005] += 1
+    elsif creation_year >= 1996
+      results[:between_1996_and_2005] += 1 # guess there is a mistake in readme
+    elsif creation_year >= 1976
+      results[:between_1976_and_1995] += 1
+    elsif creation_year >= 1950
+      results[:between_1950_and_1975] += 1
+    else
+      results[:before_1950] += 1
+    end
+  end
+  return results
+end
+
+def show_results(results)
+  puts "* Number of valid SIRETs: [#{results[:valid_sirets]}]"
+  puts "* Number of invalid SIRETs: [#{results[:invalid_sirets]}]"
+  puts "* Number of companies created before 1950: [#{results[:before_1950]}]"
+  puts "* Number of companies created between 1950 and 1975: [#{results[:between_1950_and_1975]}]"
+  puts "* Number of companies created between 1976 and 1995: [#{results[:between_1976_and_1995]}]"
+  puts "* Number of companies created before 1995 and 2005: [#{results[:between_1996_and_2005]}]"
+  puts "* Number of companies created after 2005: [#{results[:after_2005]}]"
+end
 
 
 # get the csv file from github and save it
@@ -38,7 +64,6 @@ sirene = JSON.parse(sirene_serialized)
 
 # Creating Json
 output = { output: []}
-puts output[:output].class
 sirene['records'].each do |record|
   output[:output] << {company_name: record['record']['fields']['l1_normalisee'],
                       siret: record['record']['fields']['siret'],
@@ -48,37 +73,16 @@ sirene['records'].each do |record|
                       address: "#{record['record']['fields']['numvoie']} #{record['record']['fields']['typvoie']} #{record['record']['fields']['libvoie']} #{record['record']['fields']['codpos']} #{record['record']['fields']['libcom']}"}
 end
 
-
 File.open('output.json', 'wb') do |file|
   file.write(JSON.generate(output))
 end
 
 
-# calculate creation dates
-sirene['records'].each do |record|
-  creation_year = record['record']['fields']['dcren'][0..3].to_i
-  if creation_year > 2005
-    after_2005 += 1
-  elsif creation_year >= 1996
-    between_1996_and_2005 += 1
-  elsif creation_year >= 1976
-    between_1976_and_1995 += 1
-  elsif creation_year >= 1950
-    between_1950_and_1975 += 1
-  else
-    before_1950 += 1
-  end
-end
+results = results_calculation(sirene,sirets_counter, results)
 
 # show results
 puts "Data processing complete"
-puts "* Number of valid SIRETs: [#{sirene['records'].length}]"
-puts "* Number of invalid SIRETs: [#{sirets_counter - sirene['records'].length}]"
-puts "* Number of companies created before 1950: [#{before_1950}]"
-puts "* Number of companies created between 1950 and 1975: [#{between_1950_and_1975}]"
-puts "* Number of companies created between 1976 and 1995: [#{between_1976_and_1995}]"
-puts "* Number of companies created before 1995 and 2005: [#{between_1996_and_2005}]"
-puts "* Number of companies created after 2005: [#{after_2005}]"
+show_results(results)
 
 # https://data.opendatasoft.com/api/v2/catalog/datasets/sirene%40public/records?where=siret%3A%2260203644404227%22%20OR%20siret%3A%2234145938600213%22%20OR%20siret%3A%2266204244900014%22&rows=10&select=l1_normalisee%2C%20siret%2C%20apen700%2C%20libnj%2C%20dcren&pretty=false&timezone=UTC
 
