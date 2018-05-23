@@ -4,6 +4,26 @@ require 'json'
 
 results = {valid_sirets: 0, invalid_sirets: 0, before_1950: 0, between_1950_and_1975: 0, between_1976_and_1995: 0, between_1996_and_2005: 0, after_2005: 0 }
 
+
+# generate output.json
+def generate_output(sirene)
+  output = { output: []}
+  sirene['records'].each do |record|
+    output[:output] << {company_name: record['record']['fields']['l1_normalisee'],
+                        siret: record['record']['fields']['siret'],
+                        ape_code: record['record']['fields']['apen700'],
+                        legal_nature: record['record']['fields']['libnj'],
+                        date_of_creation: record['record']['fields']['dcren'],
+                        address: "#{record['record']['fields']['numvoie']} #{record['record']['fields']['typvoie']} #{record['record']['fields']['libvoie']} #{record['record']['fields']['codpos']} #{record['record']['fields']['libcom']}"}
+  end
+
+  File.open('output.json', 'wb') do |file|
+    file.write(JSON.generate(output))
+  end
+end
+
+
+# calcul expected results
 def results_calculation(sirene, sirets_counter, results)
   results[:valid_sirets] = sirene['records'].length
   results[:invalid_sirets] = sirets_counter - sirene['records'].length
@@ -25,6 +45,7 @@ def results_calculation(sirene, sirets_counter, results)
   return results
 end
 
+# display results
 def show_results(results)
   puts "* Number of valid SIRETs: [#{results[:valid_sirets]}]"
   puts "* Number of invalid SIRETs: [#{results[:invalid_sirets]}]"
@@ -40,6 +61,7 @@ end
 download = open('https://raw.githubusercontent.com/trustpair/jobs/master/ruby/data.csv')
 csvpath = 'data.csv'
 IO.copy_stream(download, csvpath)
+puts "data.csv saved from github"
 
 # read the csv
 sirets_counter = 0
@@ -55,37 +77,21 @@ sirets = sirets[0..-14]
 # API request
 url = "https://data.opendatasoft.com/api/v2/catalog/datasets/sirene%40public/records?where=siret#{sirets}&rows=100&select=l1_normalisee%2C%20siret%2C%20apen700%2C%20libnj%2C%20dcren%2C%20numvoie%2C%20typvoie%2C%20libvoie%2C%20codpos%2C%20libcom&pretty=false"
 jsonpath = 'sirene.json'
-sirene_serialized = open(jsonpath).read
+
+# desactive if change
+# sirene_serialized = open(jsonpath).read
+
+# active this one for request from the web
+puts "API request from OpenDataSoft"
+sirene_serialized = open(url).read
+
+# active this to save
 # sirene_serialized = open(url)
 # IO.copy_stream(sirene_serialized, jsonpath)
+
 sirene = JSON.parse(sirene_serialized)
-
-
-
-# Creating Json
-output = { output: []}
-sirene['records'].each do |record|
-  output[:output] << {company_name: record['record']['fields']['l1_normalisee'],
-                      siret: record['record']['fields']['siret'],
-                      ape_code: record['record']['fields']['apen700'],
-                      legal_nature: record['record']['fields']['libnj'],
-                      date_of_creation: record['record']['fields']['dcren'],
-                      address: "#{record['record']['fields']['numvoie']} #{record['record']['fields']['typvoie']} #{record['record']['fields']['libvoie']} #{record['record']['fields']['codpos']} #{record['record']['fields']['libcom']}"}
-end
-
-File.open('output.json', 'wb') do |file|
-  file.write(JSON.generate(output))
-end
-
-
+generate_output(sirene)
 results = results_calculation(sirene,sirets_counter, results)
 
-# show results
 puts "Data processing complete"
 show_results(results)
-
-# https://data.opendatasoft.com/api/v2/catalog/datasets/sirene%40public/records?where=siret%3A%2260203644404227%22%20OR%20siret%3A%2234145938600213%22%20OR%20siret%3A%2266204244900014%22&rows=10&select=l1_normalisee%2C%20siret%2C%20apen700%2C%20libnj%2C%20dcren&pretty=false&timezone=UTC
-
-
-# %3A%2260203644404227%22%20OR%20siret%3A%2234145938600213%22
-# %3A%2260203644404227%22%20OR%20siret%3A%2234145938600213%22%20OR%20siret%3A%2266204244900014%22
