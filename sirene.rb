@@ -26,14 +26,35 @@ CSV.foreach(csvpath, csv_options) do |row|
 end
 sirets = sirets[0..-14]
 
-# API
-url = "https://data.opendatasoft.com/api/v2/catalog/datasets/sirene%40public/records?where=siret#{sirets}&rows=100&select=l1_normalisee%2C%20siret%2C%20apen700%2C%20libnj%2C%20dcren&pretty=false"
+# API request
+url = "https://data.opendatasoft.com/api/v2/catalog/datasets/sirene%40public/records?where=siret#{sirets}&rows=100&select=l1_normalisee%2C%20siret%2C%20apen700%2C%20libnj%2C%20dcren%2C%20numvoie%2C%20typvoie%2C%20libvoie%2C%20codpos%2C%20libcom&pretty=false"
 jsonpath = 'sirene.json'
 sirene_serialized = open(jsonpath).read
-# sirene_serialized = open(url).read
+# sirene_serialized = open(url)
 # IO.copy_stream(sirene_serialized, jsonpath)
 sirene = JSON.parse(sirene_serialized)
 
+
+
+# Creating Json
+output = { output: []}
+puts output[:output].class
+sirene['records'].each do |record|
+  output[:output] << {company_name: record['record']['fields']['l1_normalisee'],
+                      siret: record['record']['fields']['siret'],
+                      ape_code: record['record']['fields']['apen700'],
+                      legal_nature: record['record']['fields']['libnj'],
+                      date_of_creation: record['record']['fields']['dcren'],
+                      address: "#{record['record']['fields']['numvoie']} #{record['record']['fields']['typvoie']} #{record['record']['fields']['libvoie']} #{record['record']['fields']['codpos']} #{record['record']['fields']['libcom']}"}
+end
+
+
+File.open('output.json', 'wb') do |file|
+  file.write(JSON.generate(output))
+end
+
+
+# calculate creation dates
 sirene['records'].each do |record|
   creation_year = record['record']['fields']['dcren'][0..3].to_i
   if creation_year > 2005
@@ -49,6 +70,7 @@ sirene['records'].each do |record|
   end
 end
 
+# show results
 puts "Data processing complete"
 puts "* Number of valid SIRETs: [#{sirene['records'].length}]"
 puts "* Number of invalid SIRETs: [#{sirets_counter - sirene['records'].length}]"
