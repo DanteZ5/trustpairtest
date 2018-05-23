@@ -25,11 +25,11 @@ end
 
 # calcul expected results
 def results_calculation(sirene, sirets_counter, results)
-  results[:valid_sirets] = sirene['records'].length
-  results[:invalid_sirets] = sirets_counter - sirene['records'].length
+  results[:valid_sirets] = sirene['output'].length
+  results[:invalid_sirets] = sirets_counter - sirene['output'].length
 
-  sirene['records'].each do |record|
-    creation_year = record['record']['fields']['dcren'][0..3].to_i
+  sirene['output'].each do |output|
+    creation_year = output['date_of_creation'][0..3].to_i
     if creation_year > 2005
       results[:after_2005] += 1
     elsif creation_year >= 1996
@@ -58,40 +58,69 @@ end
 
 
 # get the csv file from github and save it
-download = open('https://raw.githubusercontent.com/trustpair/jobs/master/ruby/data.csv')
-csvpath = 'data.csv'
-IO.copy_stream(download, csvpath)
-puts "data.csv saved from github"
+unless File.exist?('data.csv')
+  download = open('https://raw.githubusercontent.com/trustpair/jobs/master/ruby/data.csv')
+  IO.copy_stream(download, 'data.csv')
+  puts "data.csv saved from github"
+else
+  puts "data.csv already exist, erase it if you want to update"
+end
 
 # read the csv
 sirets_counter = 0
 sirets = ""
 csv_options = { col_sep: ',', headers: :first_row }
-CSV.foreach(csvpath, csv_options) do |row|
-  sirets << "\%3A\%22" + row['siret'] + "\%22\%20OR\%20siret" # format for request into the url
+CSV.foreach('data.csv', csv_options) do |row|
+  sirets << "\%3A\%22" + row['siret'] + "\%22\%20OR\%20siret" # format to request into the url
   sirets_counter += 1
-  # puts "#{row['company']} - #{row['siret']}"
 end
 sirets = sirets[0..-14]
 
-# API request
 url = "https://data.opendatasoft.com/api/v2/catalog/datasets/sirene%40public/records?where=siret#{sirets}&rows=100&select=l1_normalisee%2C%20siret%2C%20apen700%2C%20libnj%2C%20dcren%2C%20numvoie%2C%20typvoie%2C%20libvoie%2C%20codpos%2C%20libcom&pretty=false"
-jsonpath = 'sirene.json'
 
-# desactive if change
-# sirene_serialized = open(jsonpath).read
 
-# active this one for request from the web
-puts "API request from OpenDataSoft"
-sirene_serialized = open(url).read
+# request API from OpenDataSoft
+unless File.exist?('output.json')
+  puts "API request from OpenDataSoft"
+  sirene_serialized = open(url).read
+  sirene = JSON.parse(sirene_serialized)
+  generate_output(sirene)
+else
+  puts "output.json already exist, erase it if you want to update"
+end
 
-# active this to save
-# sirene_serialized = open(url)
-# IO.copy_stream(sirene_serialized, jsonpath)
+new_sirene_serialized = open('output.json').read
+new_sirene = JSON.parse(new_sirene_serialized)
 
-sirene = JSON.parse(sirene_serialized)
-generate_output(sirene)
-results = results_calculation(sirene,sirets_counter, results)
+results = results_calculation(new_sirene, sirets_counter, results)
 
 puts "Data processing complete"
 show_results(results)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
